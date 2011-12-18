@@ -1,33 +1,41 @@
 package exo.robot;
 
-import java.awt.geom.*;
+import java.awt.geom.Line2D;
+import java.awt.geom.Point2D;
 import java.awt.geom.Point2D.Double;
-import java.util.*;
+import java.awt.geom.Rectangle2D;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 
-import robocode.*;
+import robocode.HitByBulletEvent;
+import robocode.HitWallEvent;
+import robocode.MessageEvent;
+import robocode.RobotDeathEvent;
+import robocode.RobotStatus;
+import robocode.ScannedRobotEvent;
+import robocode.StatusEvent;
+import robocode.TeamRobot;
 import exo.robot.FirstHero.Bearing;
+import exo.robot.FirstHero.WrappedEvent;
 
-public class FirstDroid extends AdvancedRobot
+public class FirstDroid extends TeamRobot
 {
    public RobotStatus status;
 
    public Rectangle2D.Double battle;
 
-   public double size, maxX, maxY;
+   public double size, maxX, maxY, revertingType;
 
-   public int movRadius = 130;
+   public int movRadius = 140, needStop;
 
    public Bearing currentBearing;
 
-   public Bearing revertBearing;
-
-   public boolean inBattle;
-
    public Map<String, ScannedRobotEvent> robots = new HashMap<String, ScannedRobotEvent>();
 
-   public int needStop;
-
-   @Override
    public void run()
    {
       size = Math.max(getWidth(), getHeight()) + 20;
@@ -48,15 +56,16 @@ public class FirstDroid extends AdvancedRobot
 
    private void doRun()
    {
+      FirstHero.updateRobotStatus(this, null);
       ScannedRobotEvent target = selectTarget();
       if (target == null)
          return;
+      moveRadar(target);
       moveRobot(target);
       attack(target);
-      moveRadar(target);
    }
 
-   private void attack(ScannedRobotEvent target)
+   protected void attack(ScannedRobotEvent target)
    {
       if (target.getEnergy() == 0)
       {
@@ -66,26 +75,29 @@ public class FirstDroid extends AdvancedRobot
       }
    }
 
-   private ScannedRobotEvent selectTarget()
+   protected ScannedRobotEvent selectTarget()
    {
-      return robots.values().iterator().next();
+      for (ScannedRobotEvent robot : robots.values())
+      {
+         if (!isTeammate(robot.getName()))
+         {
+            return robot;
+         }
+      }
+      return null;
    }
 
-   private void moveRadar(ScannedRobotEvent target)
+   protected void moveRadar(ScannedRobotEvent target)
    {
-      double headBearing = status.getHeadingRadians();
-      double nextRadarHeading =
-         FirstHero.getMinBearing(getRadarHeadingRadians(), headBearing + target.getBearingRadians());
-      setTurnRadarRightRadians(nextRadarHeading + 20 * (Math.PI / 180) * (nextRadarHeading > 0 ? 1 : -1));
+      setTurnRadarRight(360);
    }
 
    private void moveRobot(ScannedRobotEvent target)
    {
-      if (target.getEnergy() == 0)
-      {
-         stop();
-         return;
-      }
+      ScannedRobotEvent tmp = FirstHero.getBestTargetForDroid(getName(), robots);
+      target = tmp != null ? tmp : target;
+      movRadius = FirstHero.getBestRadiusForDroid(getName(), target);
+     
       double headBearing = status.getHeadingRadians();
       double eDistance = target.getDistance();
       double eBearing = headBearing + target.getBearingRadians();
@@ -102,59 +114,39 @@ public class FirstDroid extends AdvancedRobot
       bearings.add(new Bearing(FirstHero.getMinBearing(headBearing, movBearing2), movBearing2, 1, 2));
       bearings.add(new Bearing(FirstHero.getMinBearing(headBearing + Math.PI, movBearing), movBearing, -1, 1));
       bearings.add(new Bearing(FirstHero.getMinBearing(headBearing + Math.PI, movBearing2), movBearing2, -1, 2));
-      Collections.sort(bearings);
+      Collections.sort(bearings, new FirstHero.BearComparator().setCurrBearing(currentBearing));
 
-      printOut(bearings.get(0).bearing, bearings.get(0).forward, bearings.get(1).bearing, bearings.get(1).forward);
       if (point.x <= size || point.x >= maxX || point.y <= size || point.y >= maxY)
       {
-         if (revertBearing == null || (revertBearing != null && inBattle))
-         {
-            revertBearing = bearings.get(0);
-            inBattle = false;
-         }
-      }
-      if (point.x > size && point.x < maxX && point.y > size && point.y < maxY)
-      {
-         inBattle = true;
+         if (revertingType == 0 && currentBearing != null)
+            revertingType = currentBearing.type;
       }
       if (point.x >= size + 30 && point.x <= maxX - 30 && point.y >= size + 30 && point.y <= maxY - 30)
       {
-         revertBearing = null;
+         revertingType = 0;
       }
 
-      if (revertBearing != null && bearings.get(0).type == revertBearing.type
-         && bearings.get(0).forward == revertBearing.forward)
+      boolean done = true;
+      double movDistance;
+      Double movPoint1;
+      do
       {
-         Bearing test = bearings.remove(0);
-         printOut("Removed", test.bearing, test.forward, test.type);
+         currentBearing = bearings.remove(0);
+         movDistance =
+            Math.sqrt(Math.pow(eDistance <= movRadius + 5 ? movRadius + 10 : eDistance, 2) - Math.pow(movRadius, 2));
+         movPoint1 = FirstHero.getPoint(point, movDistance, currentBearing.relBearing);
+         done = !(currentBearing.type == revertingType);
+         movPoint1.x = movPoint1.x <= size ? size : movPoint1.x >= maxX ? maxX : movPoint1.x;
+         movPoint1.y = movPoint1.y <= size ? size : movPoint1.y >= maxY ? maxY : movPoint1.y;
+
+         movDistance = Point2D.distance(point.x, point.y, movPoint1.x, movPoint1.y) * currentBearing.forward;
       }
-
-      currentBearing = bearings.get(0);
-      double movDistance =
-         Math.sqrt(Math.pow(eDistance <= movRadius + 5 ? movRadius + 10 : eDistance, 2) - Math.pow(movRadius, 2));
-      Double movPoint1 = FirstHero.getPoint(point, movDistance, bearings.get(0).relBearing);
-      // Double movPoint2 = getPoint(new Double(getX(), getY()), movDistance,
-      // movBearing2);
-      movPoint1.x = movPoint1.x <= size ? size : movPoint1.x >= maxX ? maxX : movPoint1.x;
-      movPoint1.y = movPoint1.y <= size ? size : movPoint1.y >= maxY ? maxY : movPoint1.y;
-      // movPoint2.x = movPoint2.x < size ? size : movPoint2.x > maxX ? maxX :
-      // movPoint2.x;
-      // movPoint2.y = movPoint2.y < size ? size : movPoint2.y > maxY ? maxY :
-      // movPoint2.y;
-
-      // System.out.println(movPoint1 + "  :   " + movPoint2 + " : " + battle);
-
-      movDistance = Point2D.distance(point.x, point.y, movPoint1.x, movPoint1.y) * bearings.get(0).forward;
-      setTurnRightRadians(bearings.get(0).bearing);
+      while (revertingType != 0 && !done);
+      setTurnRightRadians(currentBearing.bearing);
       setAhead(movDistance);
 
       Line2D.Double line = new Line2D.Double(point, movPoint1);
       getGraphics().draw(line);
-
-      // Line2D.Double line2 = new Line2D.Double(new Double(getX(), getY()),
-      // movPoint2);
-      // getGraphics().draw(line2);
-
       getGraphics().draw(battle);
    }
 
@@ -162,7 +154,9 @@ public class FirstDroid extends AdvancedRobot
    public void onScannedRobot(ScannedRobotEvent event)
    {
       robots.put(event.getName(), event);
-      if ((needStop == 3 && new Random().nextInt(2) == 1) || (needStop < 3 && --needStop > 0))
+      FirstHero.updateRobotStatus(this, event);
+
+      if ((needStop == 3 && new Random().nextInt(3) == 1) || (needStop < 3 && --needStop > 0))
       {
          stop();
          moveRadar(event);
@@ -174,14 +168,12 @@ public class FirstDroid extends AdvancedRobot
       }
    }
 
-   private void printOut(Object... params)
+   @Override
+   public void onMessageReceived(MessageEvent event)
    {
-      StringBuilder builder = new StringBuilder();
-      for (Object obj : params)
-      {
-         builder.append(obj + "  :  ");
-      }
-      System.out.println(builder.toString());
+      WrappedEvent msg = (WrappedEvent)event.getMessage();
+      ScannedRobotEvent robot = FirstHero.getRealEvent(msg.sender, status, msg.robot);
+      robots.put(robot.getName(), robot);
    }
 
    @Override
@@ -191,15 +183,15 @@ public class FirstDroid extends AdvancedRobot
    }
 
    @Override
-   public void onHitRobot(HitRobotEvent event)
+   public void onRobotDeath(RobotDeathEvent event)
    {
-
+      robots.remove(event.getName());
    }
 
    @Override
    public void onHitWall(HitWallEvent event)
    {
-      revertBearing = null;
+      revertingType = currentBearing.type;
    }
 
    @Override
