@@ -1,4 +1,4 @@
-package exo.robot;
+package whatever;
 
 import java.awt.geom.Point2D;
 import java.awt.geom.Point2D.Double;

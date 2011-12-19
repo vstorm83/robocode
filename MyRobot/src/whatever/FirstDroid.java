@@ -1,20 +1,16 @@
-package exo.robot;
+package whatever;
 
-import java.awt.geom.Line2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Point2D.Double;
-import java.awt.geom.Rectangle2D;
 import java.util.*;
 
 import robocode.*;
-import exo.robot.FirstHero.Bearing;
-import exo.robot.FirstHero.WrappedEvent;
+import whatever.FirstHero.Bearing;
+import whatever.FirstHero.WrappedEvent;
 
 public class FirstDroid extends TeamRobot
 {
    public RobotStatus status;
-
-   public Rectangle2D.Double battle;
 
    public double size, maxX, maxY, revertingType;
 
@@ -29,7 +25,6 @@ public class FirstDroid extends TeamRobot
       size = Math.max(getWidth(), getHeight()) + 20;
       maxX = getBattleFieldWidth() - size;
       maxY = getBattleFieldHeight() - size;
-      battle = new Rectangle2D.Double(size, size, getBattleFieldWidth() - size * 2, getBattleFieldHeight() - size * 2);
 
       setAdjustRadarForGunTurn(true);
       setAdjustRadarForRobotTurn(true);
@@ -120,26 +115,22 @@ public class FirstDroid extends TeamRobot
 
       boolean done = true;
       double movDistance;
-      Double movPoint1;
+      Double movPoint;
       do
       {
          currentBearing = bearings.remove(0);
          movDistance =
             Math.sqrt(Math.pow(eDistance <= movRadius + 5 ? movRadius + 10 : eDistance, 2) - Math.pow(movRadius, 2));
-         movPoint1 = FirstHero.getPoint(point, movDistance, currentBearing.relBearing);
+         movPoint = FirstHero.getPoint(point, movDistance, currentBearing.relBearing);
          done = !(currentBearing.type == revertingType);
-         movPoint1.x = movPoint1.x <= size ? size : movPoint1.x >= maxX ? maxX : movPoint1.x;
-         movPoint1.y = movPoint1.y <= size ? size : movPoint1.y >= maxY ? maxY : movPoint1.y;
+         movPoint.x = movPoint.x <= size ? size : movPoint.x >= maxX ? maxX : movPoint.x;
+         movPoint.y = movPoint.y <= size ? size : movPoint.y >= maxY ? maxY : movPoint.y;
 
-         movDistance = Point2D.distance(point.x, point.y, movPoint1.x, movPoint1.y) * currentBearing.forward;
+         movDistance = Point2D.distance(point.x, point.y, movPoint.x, movPoint.y) * currentBearing.forward;
       }
       while (revertingType != 0 && !done);
       setTurnRightRadians(currentBearing.bearing);
       setAhead(movDistance);
-
-      Line2D.Double line = new Line2D.Double(point, movPoint1);
-      getGraphics().draw(line);
-      getGraphics().draw(battle);
    }
 
    @Override
