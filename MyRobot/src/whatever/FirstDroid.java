@@ -14,7 +14,7 @@ public class FirstDroid extends TeamRobot
 
    public double size, maxX, maxY, revertingType;
 
-   public int movRadius = 140, needStop;
+   public int movRadius = 140, needStop, revertTime;
 
    public Bearing currentBearing;
 
@@ -73,9 +73,7 @@ public class FirstDroid extends TeamRobot
    protected void moveRadar(ScannedRobotEvent target)
    {
       setTurnRadarRight(360);
-   }
-
-   private int revertTime;
+   }   
    
    private void moveRobot(ScannedRobotEvent target)
    {
