@@ -4,21 +4,9 @@ import java.awt.geom.Line2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Point2D.Double;
 import java.awt.geom.Rectangle2D;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 
-import robocode.HitByBulletEvent;
-import robocode.HitWallEvent;
-import robocode.MessageEvent;
-import robocode.RobotDeathEvent;
-import robocode.RobotStatus;
-import robocode.ScannedRobotEvent;
-import robocode.StatusEvent;
-import robocode.TeamRobot;
+import robocode.*;
 import exo.robot.FirstHero.Bearing;
 import exo.robot.FirstHero.WrappedEvent;
 
@@ -92,6 +80,8 @@ public class FirstDroid extends TeamRobot
       setTurnRadarRight(360);
    }
 
+   private int revertTime;
+   
    private void moveRobot(ScannedRobotEvent target)
    {
       ScannedRobotEvent tmp = FirstHero.getBestTarget(getName(), robots);
@@ -117,12 +107,15 @@ public class FirstDroid extends TeamRobot
 
       if (point.x <= size || point.x >= maxX || point.y <= size || point.y >= maxY)
       {
-         if (revertingType == 0 && currentBearing != null)
+         if (revertingType == 0 && currentBearing != null) 
+         {
             revertingType = currentBearing.type;
+            revertTime = 6;
+         }
       }
-      if (point.x >= size + 30 && point.x <= maxX - 30 && point.y >= size + 30 && point.y <= maxY - 30)
+      if (revertTime-- == 0)
       {
-         revertingType = 0;
+         revertingType = 0;         
       }
 
       boolean done = true;
@@ -179,6 +172,11 @@ public class FirstDroid extends TeamRobot
    public void onHitByBullet(HitByBulletEvent event)
    {
       needStop = 3;
+      if (currentBearing != null && revertingType == 0)
+      {
+         revertingType = currentBearing.type;
+         revertTime = 10;
+      }      
    }
 
    @Override

@@ -7,6 +7,8 @@ import java.io.Serializable;
 import java.util.Comparator;
 import java.util.Map;
 
+import robocode.BulletHitEvent;
+import robocode.BulletMissedEvent;
 import robocode.HitRobotEvent;
 import robocode.RobotStatus;
 import robocode.ScannedRobotEvent;
@@ -15,10 +17,8 @@ import robocode.util.Utils;
 
 public class FirstHero extends FirstDroid
 {
-   private double lastCenter;
-
    {
-      movRadius = 130;
+      movRadius = 110;
    }
    
    public static class BearComparator implements Comparator<FirstHero.Bearing>
@@ -48,6 +48,8 @@ public class FirstHero extends FirstDroid
       }
    }
    
+   private int hittedCount;
+   
    protected void attack(ScannedRobotEvent target)
    {
       boolean cancelFire = false;
@@ -57,16 +59,26 @@ public class FirstHero extends FirstDroid
       
       double eBearing = status.getHeadingRadians() + target.getBearingRadians();
       double center = getMinBearing(getGunHeadingRadians(), eBearing);
-      double delta = 5*Math.PI/180;
-            
-      this.lastCenter = center;
       setTurnGunRightRadians(center);
+      double power = hittedCount > 1 ? 2 : 1.5;
       if (eDistance < 100)
       {         
-         if (Math.abs(center) < delta && !cancelFire) setFire(3);
-         return;
+         power = 3;
       }
-      if (Math.abs(center) < delta && !cancelFire) setFire(1);
+      if (!cancelFire) setFire(power);
+   }   
+   
+   @Override
+   public void onBulletHit(BulletHitEvent event)
+   {
+      if (!event.getName().contains("FirstDroid"))
+         ++hittedCount;
+   }
+
+   @Override
+   public void onBulletMissed(BulletMissedEvent event)
+   {
+      hittedCount = --hittedCount < 0 ? 0 : hittedCount; 
    }
 
    public static void updateRobotStatus(TeamRobot sender, ScannedRobotEvent robot)
