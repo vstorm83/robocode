@@ -94,7 +94,7 @@ public class FirstDroid extends TeamRobot
 
    private void moveRobot(ScannedRobotEvent target)
    {
-      ScannedRobotEvent tmp = FirstHero.getBestTargetForDroid(getName(), robots);
+      ScannedRobotEvent tmp = FirstHero.getBestTarget(getName(), robots);
       target = tmp != null ? tmp : target;
       movRadius = FirstHero.getBestRadiusForDroid(getName(), target);
      
@@ -102,7 +102,6 @@ public class FirstDroid extends TeamRobot
       double eDistance = target.getDistance();
       double eBearing = headBearing + target.getBearingRadians();
 
-      Double ePoint = FirstHero.getPoint(new Double(getX(), getY()), eDistance, eBearing);
       Double point = new Double(getX(), getY());
 
       double sin = movRadius / eDistance;

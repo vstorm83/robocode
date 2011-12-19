@@ -8,19 +8,19 @@ import java.util.Comparator;
 import java.util.Map;
 
 import robocode.HitRobotEvent;
-import robocode.HitWallEvent;
 import robocode.RobotStatus;
 import robocode.ScannedRobotEvent;
-import robocode.StatusEvent;
 import robocode.TeamRobot;
 import robocode.util.Utils;
 
 public class FirstHero extends FirstDroid
 {
+   private double lastCenter;
+
    {
       movRadius = 130;
    }
-
+   
    public static class BearComparator implements Comparator<FirstHero.Bearing>
    {
       public Bearing currBearing;
@@ -47,28 +47,26 @@ public class FirstHero extends FirstDroid
          return 0;
       }
    }
-
+   
    protected void attack(ScannedRobotEvent target)
    {
-      if (target.getEnergy() == 0)
-      {
-         double eBearing = status.getHeadingRadians() + target.getBearingRadians();
-         turnRightRadians(getMinBearing(status.getHeadingRadians(), eBearing));
-         ahead(target.getDistance());
+      boolean cancelFire = false;
+      double eDistance = target.getDistance();
+      if (eDistance > 150)
+         cancelFire = true;
+      
+      double eBearing = status.getHeadingRadians() + target.getBearingRadians();
+      double center = getMinBearing(getGunHeadingRadians(), eBearing);
+      double delta = 5*Math.PI/180;
+            
+      this.lastCenter = center;
+      setTurnGunRightRadians(center);
+      if (eDistance < 100)
+      {         
+         if (Math.abs(center) < delta && !cancelFire) setFire(3);
+         return;
       }
-   }
-
-   public static class WrappedEvent implements Serializable
-   {
-      ScannedRobotEvent robot;
-
-      MiniRobotStatus sender;
-
-      public WrappedEvent(MiniRobotStatus sender, ScannedRobotEvent robot)
-      {
-         this.sender = sender;
-         this.robot = robot;
-      }
+      if (Math.abs(center) < delta && !cancelFire) setFire(1);
    }
 
    public static void updateRobotStatus(TeamRobot sender, ScannedRobotEvent robot)
@@ -93,10 +91,10 @@ public class FirstHero extends FirstDroid
       {
          double distance = Point2D.distance(sender.x, sender.y, receiver.getX(), receiver.getY());
          double eBearing =
-            Math.acos((sender.y - receiver.getY()) / distance) * ((sender.x - receiver.getX()) > 0 ? 1 : -1);         
+            Math.acos((sender.y - receiver.getY()) / distance) * ((sender.x - receiver.getX()) > 0 ? 1 : -1);
          return new ScannedRobotEvent(sender.name, sender.energy,
             getMinBearing(receiver.getHeadingRadians(), eBearing), distance, sender.headingRadians, sender.velocity);
-         
+
       }
       double tmpBearing = sender.headingRadians + robot.getBearingRadians();
       Double ePoint = getPoint(new Double(sender.x, sender.y), robot.getDistance(), tmpBearing);
@@ -115,10 +113,19 @@ public class FirstHero extends FirstDroid
       setTurnRadarRightRadians(nextRadarHeading + 20 * (Math.PI / 180) * (nextRadarHeading > 0 ? 1 : -1));
    }
 
-   // protected ScannedRobotEvent selectTarget()
-   // {
-   // return robots.values().iterator().next();
-   // }
+   public static class WrappedEvent implements Serializable
+   {
+      ScannedRobotEvent robot;
+
+      MiniRobotStatus sender;
+
+      public WrappedEvent(MiniRobotStatus sender, ScannedRobotEvent robot)
+      {
+         this.sender = sender;
+         this.robot = robot;
+      }
+   }
+
    public static class MiniRobotStatus implements Serializable
    {
       double x, y, energy, headingRadians, velocity;
@@ -134,7 +141,6 @@ public class FirstHero extends FirstDroid
          this.velocity = velocity;
          this.name = name;
       }
-
    }
 
    public static class Bearing
@@ -172,42 +178,31 @@ public class FirstHero extends FirstDroid
    @Override
    public void onHitRobot(HitRobotEvent event)
    {
-
+      robots.put(event.getName(), new ScannedRobotEvent(event.getName(), event.getEnergy(), event.getBearingRadians(),
+         0, 0, 0));
    }
 
-   @Override
-   public void onHitWall(HitWallEvent event)
-   {
-      revertingType = currentBearing.type;
-   }
-
-   @Override
-   public void onStatus(StatusEvent e)
-   {
-      this.status = e.getStatus();
-   }
-   
    public static int getBestRadiusForDroid(String name, ScannedRobotEvent target)
    {
       if (name.contains("FirstDroid") && !target.getName().contains("FirstHero"))
-         return target.getEnergy() != 999 && target.getDistance() < 100 ? 1 : 140;
+         return target.getEnergy() != 999 && target.getDistance() < 120 ? 1 : 140;
       return 140;
    }
-   
-   public static ScannedRobotEvent getBestTargetForDroid(String name, Map<String, ScannedRobotEvent> robots)
+
+   public static ScannedRobotEvent getBestTarget(String name, Map<String, ScannedRobotEvent> robots)
    {
       ScannedRobotEvent target = null;
-      if (name.contains("FirstDroid"))
+      double minDistance = 100;
+      for (ScannedRobotEvent rb : robots.values())
       {
-         double minDistance = 100;
-         for (ScannedRobotEvent evt : robots.values())
+         if (!rb.getName().equals(name) && rb.getDistance() < minDistance)
          {
-            if (!evt.getName().equals(name) && evt.getDistance() < minDistance)
+            if (!name.contains("FirstHero") || !rb.getName().contains("FirstDroid"))
             {
-               target = evt;
-               minDistance = evt.getDistance();
+               target = rb;
+               minDistance = rb.getDistance();
             }
-         }         
+         }
       }
       return target;
    }
